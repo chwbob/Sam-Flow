@@ -114,7 +114,6 @@ Useful fields:
 
 - For best results, resize input images to a resolution supported by the backbone and your GPU memory.
 - Mask tokens should appear in the corresponding prompt. For example, if the target prompt says "blue car", pass `--target-token blue --target-token car`.
-- The complete model is the default and only release path; ablation switches were intentionally removed from this version.
 
 
 ## Credits
