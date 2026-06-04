@@ -1,6 +1,6 @@
 # SAM-Flow
 
-[Arxiv](https://arxiv.org/abs/2412.08629)
+<a href='https://arxiv.org/abs/2406.03293'><img src='https://img.shields.io/badge/arXiv-2406.03293-b31b1b.svg'></a> 
  ### Official Pytorch implementation of the paper: "SAM-Flow: Source Anchored Masked Flow for Training-Free Image Editing"
  <em>by Haowang Cui, Rui Chen, Tao Luo, Tao Guo, Zheng Qin, Jiaze Wang.</em>
  </p><p style='text-align: justify;'> 
