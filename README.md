@@ -119,9 +119,8 @@ Useful fields:
 
 ## Credits
 
-SAM-Flow is built on the following open-source projects:
-- **[ThreeStudio](https://github.com/threestudio-project/threestudio)** Main Framework
-- **[InstaFlow](https://github.com/gnobitab/InstaFlow)** Large-scale text-to-image Rectified Flow model
+SAM-Flow is built on the official code of FlowEdit:
+- **[FlowEdit](https://github.com/fallenshock/FlowEdit)**
 
 ### Citation
 If you use this code for your research, please cite our paper:
