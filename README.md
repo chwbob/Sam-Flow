@@ -22,7 +22,7 @@ requirements.txt      Python dependencies
 ## Installation
 
 ```bash
-git clone <your-repo-url>
+git clone <[your-repo-url](https://github.com/chwbob/Sam-Flow)>
 cd SAM-Flow
 python -m venv .venv
 .venv\Scripts\activate
