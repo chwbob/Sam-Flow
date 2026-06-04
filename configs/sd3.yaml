@@ -1,0 +1,64 @@
+mode: sd3
+
+dataset:
+  path: data/data.yaml
+  root: data
+  strict_validation: false
+
+results:
+  root: results_SD3
+
+run:
+  device: auto
+  dtype: auto
+  overwrite: false
+  start_index: null
+  end_index: null
+  max_records: null
+  max_cases: null
+  image_names: []
+  target_codes: []
+  save_debug_maps: false
+
+models:
+  sd3_model_id: stabilityai/stable-diffusion-3-medium-diffusers
+
+flowedit:
+  negative_prompt: low quality, blurry, distorted
+  T_steps: 50
+  n_avg: 4
+  src_guidance_scale: 3.5
+  tar_guidance_scale: 7.0
+  n_min: 0
+  n_max: 33
+
+sam_flow:
+  T_steps: 50
+  n_avg: 8
+  src_guidance_scale: 1.5
+  tgt_guidance_scale: 13.5
+  n_min: 0
+  n_max: 33
+  ref_noise_seed: 999
+  blur_sigma_start: 2.0
+  blur_sigma_end: 0.6
+  q_start: 0.6
+  q_end: 0.8
+  alpha_min: 5.0
+  alpha_max: 20.0
+  tau_core: 0.5
+  ring_radius_start: 6
+  ring_radius_end: 3
+  w_ring: 0.5
+  slack: 0.03
+  anchor_rho: 1.0
+  ring_blend: 0.5
+  w_clip: 1.0
+  w_t5: 0.3
+  max_t5_length: 256
+  mask_extract:
+    attn_reduce: sym
+    norm_mode: full
+    layer_start: 8
+    layer_end: 18
+    token_match_mode: ids

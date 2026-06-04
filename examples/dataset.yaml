@@ -1,0 +1,12 @@
+- init_img: input.png
+  source_prompt: "a photo of a red car parked on a street"
+  target_prompts:
+    - "a photo of a blue car parked on a street"
+  target_codes:
+    - blue_car
+  source_mask_token:
+    - ["red", "car"]
+  target_mask_token:
+    - ["blue", "car"]
+  unchanged_token:
+    - []

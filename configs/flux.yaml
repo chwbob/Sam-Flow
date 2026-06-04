@@ -1,0 +1,55 @@
+mode: flux
+
+dataset:
+  path: data/data.yaml
+  root: data
+  strict_validation: false
+
+results:
+  root: results_flux
+
+run:
+  device: auto
+  dtype: auto
+  overwrite: false
+  start_index: null
+  end_index: null
+  max_records: null
+  max_cases: null
+  image_names: []
+  target_codes: []
+  save_debug_maps: false
+
+models:
+  flux_model_id: black-forest-labs/FLUX.1-dev
+
+flowedit:
+  negative_prompt: ""
+  T_steps: 28
+  n_avg: 8
+  src_guidance_scale: 1.5
+  tar_guidance_scale: 5.5
+  n_min: 0
+  n_max: 24
+
+sam_flow:
+  T_steps: 28
+  n_avg: 8
+  src_guidance_scale: 1.5
+  tgt_guidance_scale: 10.5
+  n_min: 0
+  n_max: 26
+  ref_noise_seed: 999
+  blur_sigma_start: 2.0
+  blur_sigma_end: 0.6
+  q_start: 0.6
+  q_end: 0.8
+  alpha_min: 5.0
+  alpha_max: 20.0
+  tau_core: 0.85
+  ring_radius_start: 6
+  ring_radius_end: 3
+  w_ring: 0.35
+  slack: 0.05
+  anchor_rho: 1.0
+  ring_blend: 0.35
