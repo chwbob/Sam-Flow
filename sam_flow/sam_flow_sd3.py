@@ -37,22 +37,6 @@ from .project_utils import (
 
 
 # =============================================================================
-# IAM-Flow (SD3-medium backbone)
-# - 淇濇寔浣?v12 鐗?IAM-Flow 鐨勬暣浣撶瓥鐣ュ畬鍏ㄤ竴鑷达細
-#   * FlowEdit 螖v 宸垎椹卞姩
-#   * 鍔ㄦ€侀槇鍊?纭害閫€鐏?+ Gaussian blur
-#   * core / ring / outer 涓夊垎鍖?#   * slack銆乺ing銆乤nchor_rho銆佺紦瀛?inversion path
-# - 鍞竴鍏抽敭宸紓锛歮ask 鎻愬彇鏀逛负 SD3 joint attention
-#   (鍙傝€冧綘鎻愪緵鐨?SD3 vs FLUX mask 鏂囨。)
-# =============================================================================
-
-# =============================================================================
-# 1) Attention Hook锛氬湪 PyTorch SDPA 灞傞潰鎶?joint attention
-#    - SD3 joint seq: [text_tokens (N_T), image_tokens (N_I)]
-#    - 闇€瑕佸悓鏃舵娊鍙栵細
-#        Image -> Text (A_IT)
-#        Text  -> Image (A_TI)
-#      骞跺绉板钩鍧?# =============================================================================
 
 attn_store = []
 _original_sdpa = F.scaled_dot_product_attention
@@ -69,16 +53,12 @@ def get_hooked_sdpa_sd3(
     attn_reduce: str = "sym",   # {"sym","it","ti","max"}
     norm_mode: str = "full",    # {"full","cross"}; "cross" = cross-only softmax
 ):
-    """
-    L_img: image token 鏁?(= H_p * W_p)
-    w_txt: (B, N_T) 鏂囨湰 token 鏉冮噸锛堝凡缁忓畬鎴?CLIP/T5 鍔犳潈涓?offset锛?
-    娉ㄦ剰锛歋D3 joint attention 鐨勫簭鍒楀竷灞€鍦ㄦ湰鑴氭湰閲屽亣瀹氫负 [Image, Text]銆?    """
+
 
     attn_reduce = (attn_reduce or "sym").lower()
     norm_mode = (norm_mode or "full").lower()
 
     def hooked_sdpa(query, key, value, attn_mask=None, dropout_p=0.0, is_causal=False, scale=None, **kwargs):
-        # 鍏堟甯歌窇 attention
         out = _original_sdpa(
             query, key, value,
             attn_mask=attn_mask,
@@ -90,7 +70,7 @@ def get_hooked_sdpa_sd3(
 
         L_seq = query.shape[-2]
         if L_seq <= L_img:
-            return out  # 涓嶆槸 joint (text+image) attention
+            return out  
 
         L_txt = L_seq - L_img
 
@@ -171,14 +151,8 @@ def get_hooked_sdpa_sd3(
 
 
 # =============================================================================
-# 2) Token span 瑙ｆ瀽锛堜笁濂?tokenizer锛歝lip1/clip2/t5锛?# =============================================================================
 
 def get_token_indices(tokenizer, prompt: str, tokens_to_search, max_length: int = None, match_mode: str = "string"):
-    """
-    鍦ㄧ粰瀹?tokenizer 鐨?token 搴忓垪涓紝瀹氫綅 tokens_to_search 瀵瑰簲鐨?token indices锛堝惈瀛愯瘝锛夈€?
-    match_mode:
-      - "string": 瀹芥澗瀛楃涓插尮閰嶏紙浣犲師 SD3 鑴氭湰鐨勭瓥鐣ワ級
-      - "ids":    鐢?input_ids 瀛愬簭鍒楀尮閰嶏紙鏇寸ǔ锛屽挨鍏跺澶?token / sentencepiece / byte-bpe锛?    """
     if not tokens_to_search:
         return []
 
@@ -194,7 +168,6 @@ def get_token_indices(tokenizer, prompt: str, tokens_to_search, max_length: int 
     )
     input_ids = encoding.input_ids[0].tolist()
 
-    # 鏈変簺 tokenizer 浼氭妸 pad 鏀惧湪鏈熬锛涘尮閰嶆椂閬垮厤璺ㄥ埌 pad 鍖哄煙
     pad_id = getattr(tokenizer, "pad_token_id", None)
     if pad_id is not None and pad_id in input_ids:
         effective_len = input_ids.index(pad_id)
@@ -224,7 +197,6 @@ def get_token_indices(tokenizer, prompt: str, tokens_to_search, max_length: int 
             if len(sub_ids) == 0:
                 continue
 
-            # 绾挎€у瓙搴忓垪鎼滅储
             Lp = len(prompt_ids)
             Ls = len(sub_ids)
             for s in range(0, max(Lp - Ls + 1, 0)):
@@ -234,7 +206,6 @@ def get_token_indices(tokenizer, prompt: str, tokens_to_search, max_length: int 
         return sorted(list(set(indices)))
 
     # -------------------------
-    # fallback: 鍘熸潵鐨勫鏉惧瓧绗︿覆鍖归厤
     # -------------------------
     tokens = tokenizer.convert_ids_to_tokens(input_ids)
     indices = []
@@ -248,7 +219,6 @@ def get_token_indices(tokenizer, prompt: str, tokens_to_search, max_length: int 
                 clean_t = (t.lower()
                     .replace(" ", "")
                     .replace("\u2581", "")  # sentencepiece marker
-                    .replace("臓", "").replace("摹", "")  # byte-bpe word boundary
                     .replace("</w>", "")
                     .replace("##", "")
                     .strip())
@@ -274,16 +244,6 @@ def build_joint_text_weights(
     token_match_mode: str = "string",  # {"string","ids"}
     device: str = "cuda",
 ):
-    """
-    鉁?SD3 姝ｇ‘鐨?text token 甯冨眬锛堜笌 diffusers 鐨?encode_prompt 瀵归綈锛夛細
-
-    - 涓や釜 CLIP Text Encoder 鐨?*token 搴忓垪闀垮害鐩稿悓*锛堥€氬父 77锛夛紝骞朵笖鍦?encode_prompt 閲屾槸锛?        clip_prompt_embeds = cat([clip1_embed, clip2_embed], dim=-1)   # 鐗瑰緛缁存嫾鎺ワ紙涓嶆槸 token 缁达紒锛?    - 鐒跺悗鎶?CLIP 鐨?token 搴忓垪 (77) 鍜?T5 鐨?token 搴忓垪 (max_sequence_length) 鍦?token 缁存嫾鎺ワ細
-        prompt_embeds = cat([clip_prompt_embeds, t5_prompt_embed], dim=-2)
-
-    鍥犳 joint 鐨?text 搴忓垪鏄細
-        [CLIP tokens (N_clip=77), T5 tokens (N_t5=max_t5_length)]
-    鑰屼笉鏄?[clip1, clip2, t5] 涓夋 token 鎷兼帴銆?
-    鏈嚱鏁拌緭鍑?w_joint: (N_clip + N_t5,) 鐨勬潈閲嶅悜閲忥紝渚?joint attention 閲?text 娈靛姞鏉冧娇鐢ㄣ€?    """
     tok1 = getattr(pipe, "tokenizer", None)
     tok2 = getattr(pipe, "tokenizer_2", None)
     tok3 = getattr(pipe, "tokenizer_3", None)
@@ -292,7 +252,6 @@ def build_joint_text_weights(
 
     N_clip = int(getattr(pipe, "tokenizer_max_length", getattr(tok1, "model_max_length", 77)))
 
-    # 杩欎袱濂?CLIP tokenizer 閮戒細 pad/trunc 鍒?N_clip
     _ = tok1(prompt, padding="max_length", truncation=True, max_length=N_clip, return_tensors="pt")
     _ = tok2(prompt, padding="max_length", truncation=True, max_length=N_clip, return_tensors="pt")
 
@@ -326,7 +285,6 @@ def build_joint_text_weights(
     }
     return w, meta
 # =============================================================================
-# 3) Mask 鏋勯€犲伐鍏峰嚱鏁帮紙涓?v12 淇濇寔涓€鑷达級
 # =============================================================================
 
 def min_max_norm(t_map: torch.Tensor):
@@ -348,8 +306,6 @@ def run_attention_scout_sd3(
     attn_reduce: str = "sym",
     norm_mode: str = "full",
 ):
-    """
-    鐢?SDPA hook 鎶撳彇 joint attention锛屽苟寰楀埌 (B, L_img) 鐨?token-weighted 鍝嶅簲銆?    鐒跺悗閫夊眰 (8-17) 骞冲潎锛岃緭鍑?(B, L_img)銆?    """
     attn_store.clear()
     F.scaled_dot_product_attention = get_hooked_sdpa_sd3(L_img=L_img, w_txt=scout_w_txt, attn_reduce=attn_reduce, norm_mode=norm_mode)
 
@@ -381,10 +337,6 @@ def run_attention_scout_sd3(
 
 
 def extract_spatial_map(vec_Limg: torch.Tensor, H_p: int, W_p: int, blur_sigma: float, device):
-    """
-    vec_Limg: (L_img,) or (B, L_img)
-    杈撳嚭锛?(H_p, W_p)锛堜粎鍙?batch=0锛夋垨 (B,H_p,W_p)
-    """
     if vec_Limg.dim() == 1:
         M = vec_Limg.view(H_p, W_p).float()
         M = TF.gaussian_blur(M.unsqueeze(0).unsqueeze(0), kernel_size=3, sigma=blur_sigma).squeeze()
@@ -392,7 +344,6 @@ def extract_spatial_map(vec_Limg: torch.Tensor, H_p: int, W_p: int, blur_sigma: 
     else:
         B = vec_Limg.shape[0]
         M = vec_Limg.view(B, H_p, W_p).float()
-        # 鎵瑰鐞?blur
         M_blur = []
         for b in range(B):
             Mb = TF.gaussian_blur(M[b].unsqueeze(0).unsqueeze(0), kernel_size=3, sigma=blur_sigma).squeeze()
@@ -524,15 +475,9 @@ def save_debug_maps(debug_maps, out_dir, step_idx):
 
 
 # =============================================================================
-# 4) SD3 Transformer 鍓嶅悜灏佽 + CFG
 # =============================================================================
 
 def transformer_forward(pipe, latents, timestep, encoder_hidden_states, pooled_projections):
-    """
-    鍏煎涓嶅悓 diffusers 鐗堟湰 SD3 transformer 鐨?forward 鍙傛暟鍛藉悕宸紓銆?    甯歌涓ょ锛?      - sample=..., timestep=...
-      - hidden_states=..., timestep=...
-
-    鍚屾椂鍋?timestep 褰㈢姸瀵归綈锛氱‘淇濇槸 (B,) 鐨?tensor銆?    """
     transformer = pipe.transformer
 
     if not torch.is_tensor(timestep):
@@ -549,7 +494,6 @@ def transformer_forward(pipe, latents, timestep, encoder_hidden_states, pooled_p
         return_dict=False,
     )
 
-    # 鐗堟湰鍏煎锛氫紭鍏?sample锛屽惁鍒?hidden_states
     try:
         return transformer(sample=latents, **kwargs)[0]
     except TypeError:
@@ -566,12 +510,7 @@ def calc_v_sd3(
     uncond_pooled,
     guidance_scale: float,
 ):
-    """
-    SD3 涓婄殑 鈥渧elocity鈥濓細
-    - 浣犵殑 IAM-Flow / FlowEdit 鍐欐硶鏈熸湜妯″瀷杈撳嚭鍙綋浣?v(t,z)
-    - SD3-medium 鍦?diffusers 涓€氬父閰嶅悎 flow-matching scheduler 浣跨敤
-    杩欓噷浣跨敤鏍囧噯 CFG锛?      v = v_uncond + s * (v_cond - v_uncond)
-    """
+   
     with torch.no_grad():
         if guidance_scale is None:
             return transformer_forward(pipe, latents, timestep, cond_embeds, cond_pooled)
@@ -582,11 +521,7 @@ def calc_v_sd3(
 
 
 def encode_prompt_pair(pipe, prompt: str, device: str, max_t5_length: int = 256):
-    """
-    鑾峰彇 cond / uncond 鐨?prompt_embeds 涓?pooled_embeds銆?    鍏煎涓嶅悓 diffusers 鐗堟湰鐨?StableDiffusion3Pipeline.encode_prompt锛圫D3 闇€瑕?prompt_2 / prompt_3锛夈€?
-    缁熶竴杩斿洖椤哄簭锛堜緵涓嬫父浣跨敤锛夛細
-        cond_embeds, pooled_cond, uncond_embeds, pooled_uncond
-    """
+    
     import inspect
 
     neg = ""
@@ -617,9 +552,7 @@ def encode_prompt_pair(pipe, prompt: str, device: str, max_t5_length: int = 256)
 
     a, b, c, d = out[:4]
 
-    # 甯歌涓ょ椤哄簭锛?    # 1) diffusers 涓荤嚎锛圫D3锛?
-    #    (prompt_embeds, negative_prompt_embeds, pooled_prompt_embeds, negative_pooled_prompt_embeds) -> dims 3,3,2,2
-    # 2) 鏌愪簺鍙樹綋锛?    #    (prompt_embeds, pooled_prompt_embeds, negative_prompt_embeds, negative_pooled_prompt_embeds) -> dims 3,2,3,2
+
     if hasattr(a, "ndim") and hasattr(b, "ndim") and hasattr(c, "ndim") and hasattr(d, "ndim"):
         if a.ndim == 3 and b.ndim == 3 and c.ndim == 2 and d.ndim == 2:
             cond_embeds, uncond_embeds, pooled_cond, pooled_uncond = a, b, c, d
@@ -628,16 +561,14 @@ def encode_prompt_pair(pipe, prompt: str, device: str, max_t5_length: int = 256)
             cond_embeds, pooled_cond, uncond_embeds, pooled_uncond = a, b, c, d
             return cond_embeds, pooled_cond, uncond_embeds, pooled_uncond
 
-    # 鍏滃簳锛氭寜涓荤嚎椤哄簭瑙ｆ瀽
+
     cond_embeds, uncond_embeds, pooled_cond, pooled_uncond = a, b, c, d
     return cond_embeds, pooled_cond, uncond_embeds, pooled_uncond
 
 
 # =============================================================================
-# 5) Source inversion cache锛堝畬鍏ㄤ繚鐣欎綘 v12 鐨勨€滃姩鎬佸弽婕旈敋瀹氣€濇€濇兂锛?# =============================================================================
 
 # =============================================================================
-# 6) 涓荤▼搴忥細IAM-Flow SD3
 # =============================================================================
 
 def main():
@@ -645,7 +576,6 @@ def main():
     dtype = torch.float16 if device == "cuda" else torch.float32
 
     # -------------------------
-    # 瓒呭弬鏁帮紙淇濇寔浣?v12 椋庢牸锛?    # -------------------------
     model_id = "stabilityai/stable-diffusion-3-medium-diffusers"
 
     T_steps = 50
@@ -656,7 +586,6 @@ def main():
     n_max = 33
     ref_noise_seed = 999
 
-    # mask blur / threshold / sigmoid / ring / slack锛堜笌浣?v12 淇濇寔涓€鑷达級
     blur_sigma_start = 2.0
     blur_sigma_end = 0.6
     q_start = 0.40
@@ -669,7 +598,7 @@ def main():
     w_ring = 0.5
     slack = 0.05
     anchor_rho = 1.0
-    ring_blend = 0.5  # ring 鍖哄仛鏇翠繚瀹堢殑 no-slack 杩囨浮锛屼笉鍐嶄娇鐢ㄥ姩鎬佸弽婕旈敋瀹?
+    ring_blend = 0.5  
 def run_sam_flow_sd3_case(
     pipe: StableDiffusion3Pipeline,
     case: Dict,
