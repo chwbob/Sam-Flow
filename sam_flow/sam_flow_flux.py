@@ -27,7 +27,7 @@ from .project_utils import (
 )
 
 # =====================================================================
-# 1. 鎷︽埅搴曞眰 Attention 璁＄畻鐨?Hook
+
 # =====================================================================
 attn_store = []
 original_sdpa = F.scaled_dot_product_attention
@@ -140,7 +140,7 @@ def calc_v_flux(pipe, latents, prompt_embeds, pooled_prompt_embeds, guidance, te
 
 
 # =====================================================================
-# 3. Mask 鏋勯€犲伐鍏峰嚱鏁?# =====================================================================
+
 def min_max_norm(t_map):
     v_min, v_max = t_map.min(), t_map.max()
     if (v_max - v_min) > 1e-6:
@@ -335,10 +335,6 @@ def save_debug_maps(debug_maps, out_dir, step_idx):
 
 
 # =====================================================================
-# 4. 涓荤▼搴忥細IAM-Flow v12
-#    - unchanged_tokens 涓虹┖锛氫繚鎸佸師鏉ョ殑 source 鈭?target attention mask
-#    - unchanged_tokens 闈炵┖锛氫粎鐢?source + unchanged_tokens 鎵?attention锛?#                            鍐嶅彇浜掕ˉ浣滀负鐪熸缂栬緫鍖?mask
-#    - ring / slack / 閫€鐏?/ core-static / dynamic anchor 鍏ㄩ儴涓嶅彉
 # =====================================================================
 def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
