@@ -43,7 +43,6 @@ _original_sdpa = F.scaled_dot_product_attention
 
 
 def _safe_float(x):
-    # SDPA hook 鍐呴儴璁＄畻鐢?float32 鏇寸ǔ
     return x.float() if x.dtype != torch.float32 else x
 
 
